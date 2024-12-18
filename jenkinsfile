@@ -1,0 +1,59 @@
+pipeline {
+    agent none  // We define the podTemplate below instead of a global agent
+
+    stages {
+        stage('Build Frontend') {
+            agent {
+                kubernetes {
+                    label 'frontend-node' // Custom label for this stage's pod
+                    containerTemplate(name: 'jnlp', image: 'jenkins/inbound-agent:latest') // JNLP container
+                    containerTemplate(name: 'frontend', image: 'node:16', command: 'cat', ttyEnabled: true) // Frontend container
+                }
+            }
+            steps {
+                container('frontend') {
+                    sh 'npm install'    // Install frontend dependencies
+                    sh 'npm run build'   // Build the frontend
+                }
+            }
+        }
+
+        stage('Build & Test Backend') {
+            agent {
+                kubernetes {
+                    label 'backend-node'  // Custom label for this stage's pod
+                    containerTemplate(name: 'jnlp', image: 'jenkins/inbound-agent:latest') // JNLP container
+                    containerTemplate(name: 'backend', image: 'python:3.9', command: 'cat', ttyEnabled: true) // Backend container
+                }
+            }
+            steps {
+                container('backend') {
+                    sh 'pip install -r requirements.txt'  // Install backend dependencies
+                    sh 'pytest'  // Run backend tests
+                }
+            }
+        }
+
+        stage('Setup Database') {
+            agent {
+                kubernetes {
+                    label 'database-node'  // Custom label for this stage's pod
+                    containerTemplate(name: 'jnlp', image: 'jenkins/inbound-agent:latest') // JNLP container
+                    containerTemplate(name: 'database', image: 'postgres:13', command: 'cat', ttyEnabled: true) // Database container
+                }
+            }
+            steps {
+                container('database') {
+                    sh 'psql -c "CREATE DATABASE mydb;"'  // Run a simple command to create a database
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying the entire stack (Frontend, Backend, Database)'
+                // Add deployment steps here, if necessary
+            }
+        }
+    }
+}
